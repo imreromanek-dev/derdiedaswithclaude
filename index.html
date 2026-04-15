@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Der · Die · Das</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1645,30 +1648,77 @@ async function loadDB() {
 }
 
 // csvTopic values match column E of Nouns.csv exactly
+
+// ════════════════════════════════════════════════
+//  PROGRESS PERSISTENCE  (localStorage)
+// ════════════════════════════════════════════════
+// Kulcs: 'ddd_v1'  →  { "berlin_leisure": 4, "swiss-alps_nature": 3, … }
+
+const SAVE_KEY = 'ddd_v1';
+
+function saveProgress() {
+  const data = {};
+  TOPICS.forEach(topic => {
+    topic.categories.forEach(cat => {
+      data[`${topic.id}_${cat.id}`] = cat.highScore;
+    });
+  });
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) {}
+}
+
+function loadProgress() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    TOPICS.forEach(topic => {
+      topic.categories.forEach(cat => {
+        const val = data[`${topic.id}_${cat.id}`];
+        if (typeof val === 'number') cat.highScore = val;
+      });
+      // completed = kategóriák amelyekben van legalább 1 pont
+      topic.completed = topic.categories.filter(c => c.highScore > 0).length;
+    });
+  } catch (e) {}
+}
+
+// Kategória high score frissítése játék végén
+function updateCategoryHighScore(score) {
+  const cat = state.selectedCategory;
+  if (!cat) return;
+  if (score > cat.highScore) {
+    cat.highScore = score;
+    // completed újraszámolás a szülő topicban
+    const topic = TOPICS.find(t => t.categories.includes(cat));
+    if (topic) topic.completed = topic.categories.filter(c => c.highScore > 0).length;
+    saveProgress();
+  }
+}
+
 const TOPICS = [
   {
     id: 'berlin',
     name: 'Berlin',
     location: 'Brandenburg Gate',
-    completed: 1,
-    total: 7,
+    completed: 0,
+    total: 3,
     image: 'image-0.png',
     categories: [
-      { id: 'leisure',   name: 'Leisure',        icon: '🎭', highScore: 17, csvTopic: 'Leisure'        },
-      { id: 'food',      name: 'Food',            icon: '🍺', highScore: 12, csvTopic: 'Food'           },
-      { id: 'transport', name: 'Transportation',  icon: '🚌', highScore: 8,  csvTopic: 'Transportation' },
+      { id: 'leisure',   name: 'Leisure',        icon: '🎭', highScore: 0, csvTopic: 'Leisure'        },
+      { id: 'food',      name: 'Food',            icon: '🍺', highScore: 0, csvTopic: 'Food'           },
+      { id: 'transport', name: 'Transportation',  icon: '🚌', highScore: 0, csvTopic: 'Transportation' },
     ],
   },
   {
     id: 'swiss-alps',
     name: 'Swiss Alps',
     location: 'Matterhorn',
-    completed: 3,
-    total: 7,
+    completed: 0,
+    total: 2,
     image: 'image-1.png',
     categories: [
-      { id: 'nature',  name: 'Nature',   icon: '🏔️', highScore: 21, csvTopic: 'Nature'  },
-      { id: 'animals', name: 'Animals',  icon: '🐾', highScore: 15, csvTopic: 'Animals' },
+      { id: 'nature',  name: 'Nature',   icon: '🏔️', highScore: 0, csvTopic: 'Nature'  },
+      { id: 'animals', name: 'Animals',  icon: '🐾', highScore: 0, csvTopic: 'Animals' },
     ],
   },
   {
@@ -1676,7 +1726,7 @@ const TOPICS = [
     name: 'Baltic Sea',
     location: 'Rügen Island',
     completed: 0,
-    total: 7,
+    total: 2,
     image: 'image-2.png',
     categories: [
       { id: 'society', name: 'Society',  icon: '🌊', highScore: 0, csvTopic: 'Society'  },
@@ -1687,13 +1737,13 @@ const TOPICS = [
     id: 'vienna',
     name: 'Vienna',
     location: 'Schönbrunn Palace',
-    completed: 5,
-    total: 7,
+    completed: 0,
+    total: 3,
     image: 'image-3.png',
     categories: [
-      { id: 'arts',       name: 'The Arts',    icon: '🎻', highScore: 30, csvTopic: 'The arts'    },
-      { id: 'food',       name: 'Food',        icon: '☕', highScore: 19, csvTopic: 'Food'        },
-      { id: 'psychology', name: 'Psychology',  icon: '🌿', highScore: 11, csvTopic: 'Psychology'  },
+      { id: 'arts',       name: 'The Arts',    icon: '🎻', highScore: 0, csvTopic: 'The arts'    },
+      { id: 'food',       name: 'Food',        icon: '☕', highScore: 0, csvTopic: 'Food'        },
+      { id: 'psychology', name: 'Psychology',  icon: '🌿', highScore: 0, csvTopic: 'Psychology'  },
     ],
   },
 ];
@@ -1933,9 +1983,10 @@ function goToWordList(category) {
 
 function goToGame(category) {
   state.selectedCategory = category;
-  state.round    = 1;
-  state.score    = 0;
-  state.usedIdxs = [];
+  state.round     = 1;
+  state.score     = 0;
+  state.usedIdxs  = [];
+  state.highScore = category.highScore; // tárolt high score betöltése
   updateHUD();
   showView('game');
   initPoppers();
@@ -2267,6 +2318,7 @@ function handleWrong(reason) {
       }
       $('modal-title').className = 'gm-title';
       if (state.score > state.highScore) state.highScore = state.score;
+      updateCategoryHighScore(state.highScore);
       updateHUD();
       const art = state.word.article;
       const capArt = art.charAt(0).toUpperCase() + art.slice(1);
@@ -2283,6 +2335,7 @@ function handleWrong(reason) {
 
 function finishGame() {
   if (state.score > state.highScore) state.highScore = state.score;
+  updateCategoryHighScore(state.highScore);
   updateHUD();
   $('modal-title').textContent       = '🎉 Fertig!';
   $('modal-title').className         = 'gm-title correct';
@@ -2369,7 +2422,7 @@ $('main-menu-btn').addEventListener('click', () => {
 const audioMenu = $('audio-menu');
 const audioGame = $('audio-game');
 audioMenu.volume = 0.40;
-audioGame.volume = 0.40;
+audioGame.volume = 0.20;
 
 // ── Web Audio API – zéró latencia SFX ────────────
 // Az Audio() elemekkel ellentétben a decodeAudioData előre dekódolja a hangot,
@@ -2424,7 +2477,7 @@ function speakWord(word) {
     utt.pitch   = 1;
     utt.volume  = 1;
     window.speechSynthesis.speak(utt);
-  }, 600);
+  }, 2000);
 }
 
 function cancelTTS() {
@@ -2612,6 +2665,7 @@ function initHorizontalScroll(scrollEl) {
 //  INIT
 // ════════════════════════════════════════════════
 loadDB().then(() => {
+  loadProgress();   // localStorage → TOPICS high score-ok visszatöltése
   showView('welcome');
   initHorizontalScroll($('topic-scroll'));
   initHorizontalScroll($('city-scroll'));
