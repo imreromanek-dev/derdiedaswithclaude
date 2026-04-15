@@ -2175,6 +2175,8 @@ function startRound() {
   applyY(0);
   setBtns(true);
   speakWord(state.word.german); // 600 ms delay, de-DE TTS
+
+  state.startTime = performance.now();
   state.phase = 'rising';
   state.rafId = requestAnimationFrame(tick);
 }
@@ -2369,27 +2371,43 @@ const audioGame = $('audio-game');
 audioMenu.volume = 0.40;
 audioGame.volume = 0.40;
 
-// ── SFX objektumok ───────────────────────────────
-function makeSFX(src, vol = 1.0) {
-  const a = new Audio(src);
-  a.volume = vol;
-  return a;
-}
-const sfx = {
-  correct  : makeSFX('Correct.mp3',                 0.9),
-  pop      : makeSFX('Wrong-Answer-Balloon-Pop.mp3', 1.0),
-  incorrect: makeSFX('Incorrect.mp3',                0.9),
-  highScore: makeSFX('High-Score.mp3',               0.9),
-  click    : makeSFX('Menu-Click.mp3',               0.6),
-};
+// ── Web Audio API – zéró latencia SFX ────────────
+// Az Audio() elemekkel ellentétben a decodeAudioData előre dekódolja a hangot,
+// így a lejátszás azonnal, delay nélkül indul el.
+const _actx = new (window.AudioContext || window.webkitAudioContext)();
+const _sfxVolumes = { correct: 0.9, pop: 1.0, incorrect: 0.9, highScore: 0.9, click: 0.6 };
+const _sfxBuffers = {};
 
-// ── SFX lejátszó ─────────────────────────────────
+async function _loadSFX(key, url) {
+  try {
+    const res = await fetch(url);
+    const ab  = await res.arrayBuffer();
+    _sfxBuffers[key] = await _actx.decodeAudioData(ab);
+  } catch (e) { /* fájl hiányában csendben folytatja */ }
+}
+
+// Minden SFX előre betölt
+Promise.all([
+  _loadSFX('correct',   'Correct.mp3'),
+  _loadSFX('pop',       'Wrong-Answer-Balloon-Pop.mp3'),
+  _loadSFX('incorrect', 'Incorrect.mp3'),
+  _loadSFX('highScore', 'High-Score.mp3'),
+  _loadSFX('click',     'Menu-Click.mp3'),
+]);
+
 function playSFX(key) {
   if (!state.soundOn) return;
-  const a = sfx[key];
-  if (!a) return;
-  a.currentTime = 0;
-  a.play().catch(() => {});
+  const buf = _sfxBuffers[key];
+  if (!buf) return;
+  // AudioContext lehet suspended (autoplay policy) – resume egyszer
+  if (_actx.state === 'suspended') _actx.resume();
+  const src  = _actx.createBufferSource();
+  const gain = _actx.createGain();
+  gain.gain.value = _sfxVolumes[key] ?? 1;
+  src.buffer = buf;
+  src.connect(gain);
+  gain.connect(_actx.destination);
+  src.start(0);
 }
 
 // ── TTS – szó kimondása de-DE hangon ─────────────
@@ -2400,11 +2418,11 @@ function speakWord(word) {
   _ttsTimer = setTimeout(() => {
     if (!state.soundOn) return;
     window.speechSynthesis.cancel();
-    const utt    = new SpeechSynthesisUtterance(word);
-    utt.lang     = 'de-DE';
-    utt.rate     = 0.88;
-    utt.pitch    = 1;
-    utt.volume   = 1;
+    const utt = new SpeechSynthesisUtterance(word);
+    utt.lang    = 'de-DE';
+    utt.rate    = 0.88;
+    utt.pitch   = 1;
+    utt.volume  = 1;
     window.speechSynthesis.speak(utt);
   }, 600);
 }
@@ -2449,6 +2467,7 @@ function toggleSound() {
     stopAllMusic();
     cancelTTS();
   } else {
+    if (_actx.state === 'suspended') _actx.resume();
     if (state.view === 'game') playGameMusic();
     else                       playMenuMusic();
   }
@@ -2457,8 +2476,11 @@ function toggleSound() {
 $('welcome-sound-btn').addEventListener('click', toggleSound);
 if ($('sound-btn')) $('sound-btn').addEventListener('click', toggleSound);
 
-// ── Menu-Click: minden egér-kattintásra ──────────
-document.addEventListener('click', () => playSFX('click'), true);
+// ── Menu-Click: minden kattintásra, azonnal ───────
+document.addEventListener('click', () => {
+  if (_actx.state === 'suspended') _actx.resume();
+  playSFX('click');
+}, true);
 
 
 // ════════════════════════════════════════════════
