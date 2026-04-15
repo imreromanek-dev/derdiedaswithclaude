@@ -1386,9 +1386,9 @@
 </head>
 <body>
 
-<!-- Audio tracks (src-t majd cseréld valódi fájlra) -->
-<audio id="audio-menu" loop></audio>
-<audio id="audio-game" loop></audio>
+<!-- ══ Zene ══ -->
+<audio id="audio-menu" src="Menu-Music.mp3"    loop preload="auto"></audio>
+<audio id="audio-game" src="Gameplay-Music.mp3" loop preload="auto"></audio>
 
 <!-- ═══════════════════════════════════════════════
      1. WELCOME SCREEN
@@ -1603,39 +1603,48 @@
 //  MOCK DATA
 // ════════════════════════════════════════════════
 
-const ALL_WORDS = [
-  { german: "Schwimmbecken", english: "swimming pool",   article: "das" },
-  { german: "Hund",          english: "dog",             article: "der" },
-  { german: "Katze",         english: "cat",             article: "die" },
-  { german: "Tisch",         english: "table",           article: "der" },
-  { german: "Tür",           english: "door",            article: "die" },
-  { german: "Fenster",       english: "window",          article: "das" },
-  { german: "Stuhl",         english: "chair",           article: "der" },
-  { german: "Blume",         english: "flower",          article: "die" },
-  { german: "Buch",          english: "book",            article: "das" },
-  { german: "Baum",          english: "tree",            article: "der" },
-  { german: "Abenteuer",     english: "adventure",       article: "das" },
-  { german: "Brücke",        english: "bridge",          article: "die" },
-  { german: "Flugzeug",      english: "airplane",        article: "das" },
-  { german: "Garten",        english: "garden",          article: "der" },
-  { german: "Haus",          english: "house",           article: "das" },
-  { german: "Insel",         english: "island",          article: "die" },
-  { german: "Junge",         english: "boy",             article: "der" },
-  { german: "Kirche",        english: "church",          article: "die" },
-  { german: "Lampe",         english: "lamp",            article: "die" },
-  { german: "Markt",         english: "market",          article: "der" },
-  { german: "Nacht",         english: "night",           article: "die" },
-  { german: "Ozean",         english: "ocean",           article: "der" },
-  { german: "Park",          english: "park",            article: "der" },
-  { german: "Quelle",        english: "spring / source", article: "die" },
-  { german: "Regen",         english: "rain",            article: "der" },
-  { german: "Schule",        english: "school",          article: "die" },
-  { german: "Tier",          english: "animal",          article: "das" },
-  { german: "Ufer",          english: "shore",           article: "das" },
-  { german: "Vogel",         english: "bird",            article: "der" },
-  { german: "Wasser",        english: "water",           article: "das" },
-];
+// ════════════════════════════════════════════════
+//  WORD DATABASE  (loaded from Nouns.csv)
+// ════════════════════════════════════════════════
 
+let DB = [];  // { article, german, english, difficulty, topic }
+
+// Kumulatív nehézség: Basic → B, Intermediate → B+M, Advanced → B+M+A
+const DIFF_LEVELS = { Basic: 1, Intermediate: 2, Advanced: 3 };
+const CODE_LEVEL  = { B: 1, M: 2, A: 3 };
+
+function getWords(csvTopic, difficulty) {
+  const maxLevel = DIFF_LEVELS[difficulty] || 1;
+  return DB.filter(w => w.topic === csvTopic && CODE_LEVEL[w.difficulty] <= maxLevel);
+}
+
+async function loadDB() {
+  try {
+    const res = await fetch('Nouns.csv');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const lines = text.split('\n');
+    // Row 0 is header; data starts at row 1
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',');
+      if (cols.length < 5) continue;
+      const article    = cols[0].trim().toLowerCase();
+      const german     = cols[1].trim();
+      const english    = cols[2].trim();
+      const difficulty = cols[3].trim();
+      const topic      = cols[4].trim();
+      if (!['der','die','das'].includes(article)) continue;
+      if (!['B','M','A'].includes(difficulty))    continue;
+      if (!german || !topic) continue;
+      DB.push({ article, german, english, difficulty, topic });
+    }
+    console.log(`DB loaded: ${DB.length} words`);
+  } catch (e) {
+    console.warn('Could not load Nouns.csv — game will use an empty word list.', e);
+  }
+}
+
+// csvTopic values match column E of Nouns.csv exactly
 const TOPICS = [
   {
     id: 'berlin',
@@ -1645,9 +1654,9 @@ const TOPICS = [
     total: 7,
     image: 'image-0.png',
     categories: [
-      { id: 'leisure',   name: 'Leisure',   icon: '🎭', highScore: 17, words: ALL_WORDS },
-      { id: 'food',      name: 'Food',      icon: '🍺', highScore: 12, words: ALL_WORDS },
-      { id: 'transport', name: 'Transport', icon: '🚌', highScore: 8,  words: ALL_WORDS },
+      { id: 'leisure',   name: 'Leisure',        icon: '🎭', highScore: 17, csvTopic: 'Leisure'        },
+      { id: 'food',      name: 'Food',            icon: '🍺', highScore: 12, csvTopic: 'Food'           },
+      { id: 'transport', name: 'Transportation',  icon: '🚌', highScore: 8,  csvTopic: 'Transportation' },
     ],
   },
   {
@@ -1658,8 +1667,8 @@ const TOPICS = [
     total: 7,
     image: 'image-1.png',
     categories: [
-      { id: 'nature', name: 'Nature', icon: '🏔️', highScore: 21, words: ALL_WORDS },
-      { id: 'sports', name: 'Sports', icon: '⛷️', highScore: 15, words: ALL_WORDS },
+      { id: 'nature',  name: 'Nature',   icon: '🏔️', highScore: 21, csvTopic: 'Nature'  },
+      { id: 'animals', name: 'Animals',  icon: '🐾', highScore: 15, csvTopic: 'Animals' },
     ],
   },
   {
@@ -1670,8 +1679,8 @@ const TOPICS = [
     total: 7,
     image: 'image-2.png',
     categories: [
-      { id: 'ocean',   name: 'Ocean',   icon: '🌊', highScore: 0, words: ALL_WORDS },
-      { id: 'history', name: 'History', icon: '🏛️', highScore: 0, words: ALL_WORDS },
+      { id: 'society', name: 'Society',  icon: '🌊', highScore: 0, csvTopic: 'Society'  },
+      { id: 'science', name: 'Science',  icon: '🔬', highScore: 0, csvTopic: 'Science'  },
     ],
   },
   {
@@ -1682,9 +1691,9 @@ const TOPICS = [
     total: 7,
     image: 'image-3.png',
     categories: [
-      { id: 'culture', name: 'Culture', icon: '🎻', highScore: 30, words: ALL_WORDS },
-      { id: 'food',    name: 'Food',    icon: '☕', highScore: 19, words: ALL_WORDS },
-      { id: 'parks',   name: 'Parks',   icon: '🌿', highScore: 11, words: ALL_WORDS },
+      { id: 'arts',       name: 'The Arts',    icon: '🎻', highScore: 30, csvTopic: 'The arts'    },
+      { id: 'food',       name: 'Food',        icon: '☕', highScore: 19, csvTopic: 'Food'        },
+      { id: 'psychology', name: 'Psychology',  icon: '🌿', highScore: 11, csvTopic: 'Psychology'  },
     ],
   },
 ];
@@ -1916,7 +1925,7 @@ function returnToCity(topic) {
 
 function goToWordList(category) {
   state.selectedCategory = category;
-  renderWordList(category.words);
+  renderWordList(getWords(category.csvTopic, state.difficulty));
   // Don't call showView — keep city screen visible behind word list
   $('word-list-screen').classList.remove('hidden');
   state.view = 'wordlist';
@@ -2082,7 +2091,7 @@ function renderCityCards(topic) {
       </div>
       <div class="city-card-actions">
         <button class="city-play-btn">Play</button>
-        <button class="city-words-btn">${LIST_ICON_SVG}List of words (${cat.words.length})</button>
+        <button class="city-words-btn">${LIST_ICON_SVG}List of words (${getWords(cat.csvTopic, state.difficulty).length})</button>
       </div>
     `;
     card.querySelector('.city-play-btn').addEventListener('click', () => goToGame(cat));
@@ -2148,7 +2157,9 @@ function startRound() {
   $('modal-english').style.color      = '';
 
   // Pick word
-  const words = state.selectedCategory ? state.selectedCategory.words : ALL_WORDS;
+  const words = state.selectedCategory
+    ? getWords(state.selectedCategory.csvTopic, state.difficulty)
+    : DB;
   let pool = words.map((_, i) => i).filter(i => !state.usedIdxs.includes(i));
   if (pool.length === 0) { state.usedIdxs = []; pool = words.map((_, i) => i); }
   const idx = pool[Math.floor(Math.random() * pool.length)];
@@ -2163,8 +2174,7 @@ function startRound() {
   state.startY   = state.balloonY;
   applyY(0);
   setBtns(true);
-
-  state.startTime = performance.now();
+  speakWord(state.word.german); // 600 ms delay, de-DE TTS
   state.phase = 'rising';
   state.rafId = requestAnimationFrame(tick);
 }
@@ -2202,6 +2212,7 @@ function handleCorrect() {
   state.phase = 'animating';
   cancelAnimationFrame(state.rafId);
   setBtns(false);
+  cancelTTS();
 
   const $bg = $('balloon-group');
   // Fly out just barely above the viewport top + 300px
@@ -2212,6 +2223,7 @@ function handleCorrect() {
   setTimeout(() => {
     $bg.style.transition = '';
     $('check-icon').classList.add('show');
+    playSFX('correct');
     state.score++;
     updateHUD();
 
@@ -2232,9 +2244,11 @@ function handleWrong(reason) {
   state.phase = 'animating';
   cancelAnimationFrame(state.rafId);
   setBtns(false);
+  cancelTTS();
 
   $('balloon-left').classList.add('pop');
   $('balloon-right').classList.add('pop');
+  playSFX('pop');
   playPoppers();
 
   setTimeout(() => {
@@ -2259,6 +2273,7 @@ function handleWrong(reason) {
       $('modal-english').textContent      = state.word.english;
       $('modal-score').textContent        = state.score;
       $('modal-hs').textContent           = state.highScore;
+      playSFX('incorrect');
       $('game-modal-overlay').classList.remove('hidden');
     }, 580);
   }, 300);
@@ -2281,6 +2296,7 @@ function finishGame() {
   document.querySelector('.gm-correct-block').style.display = 'none';
   $('try-again-btn').textContent = 'Main menu';
   $('main-menu-btn').style.display = 'none';
+  playSFX('highScore');
   $('game-modal-overlay').classList.remove('hidden');
 }
 
@@ -2347,33 +2363,67 @@ $('main-menu-btn').addEventListener('click', () => {
 //  AUDIO MANAGEMENT
 // ════════════════════════════════════════════════
 
+// ── Zene (loop) ──────────────────────────────────
 const audioMenu = $('audio-menu');
 const audioGame = $('audio-game');
+audioMenu.volume = 0.40;
+audioGame.volume = 0.40;
 
-// ── Plug in your track URLs here ────────────────
-// audioMenu.src = 'menu-music.mp3';
-// audioGame.src = 'game-music.mp3';
-// ────────────────────────────────────────────────
+// ── SFX objektumok ───────────────────────────────
+function makeSFX(src, vol = 1.0) {
+  const a = new Audio(src);
+  a.volume = vol;
+  return a;
+}
+const sfx = {
+  correct  : makeSFX('Correct.mp3',                 0.9),
+  pop      : makeSFX('Wrong-Answer-Balloon-Pop.mp3', 1.0),
+  incorrect: makeSFX('Incorrect.mp3',                0.9),
+  highScore: makeSFX('High-Score.mp3',               0.9),
+  click    : makeSFX('Menu-Click.mp3',               0.6),
+};
 
-audioMenu.volume = 0.5;
-audioGame.volume = 0.5;
-
-function syncSoundBtns() {
-  $('welcome-sound-icon-on').classList.toggle('hidden', !state.soundOn);
-  $('welcome-sound-icon-off').classList.toggle('hidden', state.soundOn);
-  if ($('sound-icon-on'))  $('sound-icon-on').classList.toggle('hidden', !state.soundOn);
-  if ($('sound-icon-off')) $('sound-icon-off').classList.toggle('hidden', state.soundOn);
+// ── SFX lejátszó ─────────────────────────────────
+function playSFX(key) {
+  if (!state.soundOn) return;
+  const a = sfx[key];
+  if (!a) return;
+  a.currentTime = 0;
+  a.play().catch(() => {});
 }
 
+// ── TTS – szó kimondása de-DE hangon ─────────────
+let _ttsTimer = null;
+function speakWord(word) {
+  clearTimeout(_ttsTimer);
+  if (!state.soundOn || !window.speechSynthesis) return;
+  _ttsTimer = setTimeout(() => {
+    if (!state.soundOn) return;
+    window.speechSynthesis.cancel();
+    const utt    = new SpeechSynthesisUtterance(word);
+    utt.lang     = 'de-DE';
+    utt.rate     = 0.88;
+    utt.pitch    = 1;
+    utt.volume   = 1;
+    window.speechSynthesis.speak(utt);
+  }, 600);
+}
+
+function cancelTTS() {
+  clearTimeout(_ttsTimer);
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+}
+
+// ── Zene váltók ──────────────────────────────────
 function playMenuMusic() {
-  if (!state.soundOn || !audioMenu.src) return;
+  if (!state.soundOn) return;
   audioGame.pause();
   audioGame.currentTime = 0;
-  audioMenu.play().catch(() => {});  // catch autoplay policy errors silently
+  audioMenu.play().catch(() => {});
 }
 
 function playGameMusic() {
-  if (!state.soundOn || !audioGame.src) return;
+  if (!state.soundOn) return;
   audioMenu.pause();
   audioMenu.currentTime = 0;
   audioGame.play().catch(() => {});
@@ -2384,23 +2434,31 @@ function stopAllMusic() {
   audioGame.pause();
 }
 
+// ── Hang ki/be gomb szinkron ─────────────────────
+function syncSoundBtns() {
+  $('welcome-sound-icon-on').classList.toggle('hidden', !state.soundOn);
+  $('welcome-sound-icon-off').classList.toggle('hidden',  state.soundOn);
+  if ($('sound-icon-on'))  $('sound-icon-on').classList.toggle('hidden', !state.soundOn);
+  if ($('sound-icon-off')) $('sound-icon-off').classList.toggle('hidden',  state.soundOn);
+}
+
 function toggleSound() {
   state.soundOn = !state.soundOn;
   syncSoundBtns();
   if (!state.soundOn) {
     stopAllMusic();
+    cancelTTS();
   } else {
-    // Resume the right track for the current view
-    if (state.view === 'game') {
-      playGameMusic();
-    } else {
-      playMenuMusic();
-    }
+    if (state.view === 'game') playGameMusic();
+    else                       playMenuMusic();
   }
 }
 
 $('welcome-sound-btn').addEventListener('click', toggleSound);
 if ($('sound-btn')) $('sound-btn').addEventListener('click', toggleSound);
+
+// ── Menu-Click: minden egér-kattintásra ──────────
+document.addEventListener('click', () => playSFX('click'), true);
 
 
 // ════════════════════════════════════════════════
@@ -2531,9 +2589,11 @@ function initHorizontalScroll(scrollEl) {
 // ════════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════════
-showView('welcome');
-initHorizontalScroll($('topic-scroll'));
-initHorizontalScroll($('city-scroll'));
+loadDB().then(() => {
+  showView('welcome');
+  initHorizontalScroll($('topic-scroll'));
+  initHorizontalScroll($('city-scroll'));
+});
 </script>
 </body>
 </html>
