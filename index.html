@@ -1654,7 +1654,7 @@ async function loadDB() {
 // ════════════════════════════════════════════════
 // Kulcs: 'ddd_v1'  →  { "berlin_leisure": 4, "swiss-alps_nature": 3, … }
 
-const SAVE_KEY = 'ddd_v1';
+const SAVE_KEY = 'ddd_v2';
 
 function saveProgress() {
   const data = {};
@@ -2477,7 +2477,7 @@ function speakWord(word) {
     utt.pitch   = 1;
     utt.volume  = 1;
     window.speechSynthesis.speak(utt);
-  }, 2000);
+  }, 3000);
 }
 
 function cancelTTS() {
