@@ -613,18 +613,32 @@
       background: #fff;
       flex-shrink: 0;
       padding: 0 22px 32px;
-    .city-card-locked {
-      opacity: 0.42;
-      pointer-events: none;
+    /* Locked play button */
+    .city-play-btn[disabled] {
+      background: linear-gradient(270deg, #ECDA8C 0%, #E5BC3A 100%);
+      color: #fff;
+      box-shadow: 0 4px 0px #b8900a, 0 6px 16px rgba(0,0,0,0.12);
+      cursor: default;
+      transform: none !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: clamp(12px, calc(0.5vw + 9.5px), 15px);
     }
-    .city-card-locked .city-play-btn,
-    .city-card-locked .city-words-btn { cursor: not-allowed; }
-    .city-card-lock-badge {
-      position: absolute;
-      top: 10px; right: 10px;
-      font-size: 22px;
-      filter: drop-shadow(0 1px 2px rgba(0,0,0,.4));
+    .city-play-btn[disabled]:hover {
+      box-shadow: 0 4px 0px #b8900a, 0 6px 16px rgba(0,0,0,0.12);
+      transform: none;
     }
+    /* Locked words button */
+    .city-words-btn[disabled] {
+      background: #fff;
+      box-shadow: 0 2px 36px 0 rgba(0,0,0,0.17);
+      color: #CCD3D5;
+      cursor: default;
+    }
+    .city-words-btn[disabled] .city-words-btn-icon rect,
+    .city-words-btn[disabled] .city-words-btn-icon circle { fill: #CCD3D5; }
       box-shadow: 0 4px 32px 0 rgba(0,0,0,0.12);
       user-select: none;
       -webkit-user-select: none;
@@ -1036,13 +1050,7 @@
       flex-shrink: 0;
     }
     .nav-icon-btn:hover { background: rgba(255,255,255,1); }
-    #sound-btn {
-      background: rgba(255,255,255,0.30);
-      position: fixed;
-      top: 16px;
-      right: 16px;
-      z-index: 9999;
-    }
+    #sound-btn { background: rgba(255,255,255,0.30); }
     #sound-btn:hover { background: rgba(255,255,255,0.45); }
     .nav-icon-btn svg { width: 52%; height: 52%; }
 
@@ -2184,7 +2192,7 @@ function renderCityCards(topic) {
   topic.categories.forEach((cat, idx) => {
     const unlocked = topic.isUnlocked ? topic.isUnlocked(idx) : true;
     const card = document.createElement('div');
-    card.className = 'city-card' + (unlocked ? '' : ' city-card-locked');
+    card.className = 'city-card';
     card.innerHTML = `
       <div class="city-card-header">
         <img class="city-card-header-bg" src="${CITY_CARD_HEADER_IMG}" alt="" draggable="false">
@@ -2193,14 +2201,13 @@ function renderCityCards(topic) {
           <img class="city-card-icon-img" src="${TENNIS_ICON_URI}" alt="${cat.name}">
           <span class="city-card-cat">${cat.name}</span>
         </div>
-        ${!unlocked ? '<div class="city-card-lock-badge">🔒</div>' : ''}
       </div>
       <div class="city-card-hs">
         <div class="city-hs-label">High score</div>
         <div class="city-hs-value">${cat.highScore}</div>
       </div>
       <div class="city-card-actions">
-        <button class="city-play-btn" ${!unlocked ? 'disabled' : ''}>Play</button>
+        <button class="city-play-btn" ${!unlocked ? 'disabled' : ''}>${unlocked ? 'Play' : `<svg width="15" height="18" viewBox="0 0 15 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4.82143 4.82143V6.42857H10.1786V4.82143C10.1786 3.34821 8.97321 2.14286 7.5 2.14286C5.9933 2.14286 4.82143 3.34821 4.82143 4.82143ZM2.67857 6.42857V4.82143C2.67857 2.17634 4.82143 0 7.5 0C10.1451 0 12.3214 2.17634 12.3214 4.82143V6.42857H12.8571C14.029 6.42857 15 7.39955 15 8.57143V15C15 16.2054 14.029 17.1429 12.8571 17.1429H2.14286C0.9375 17.1429 0 16.2054 0 15V8.57143C0 7.39955 0.9375 6.42857 2.14286 6.42857H2.67857Z" fill="white"/></svg>Reach 50 points to unlock level`}</button>
         <button class="city-words-btn" ${!unlocked ? 'disabled' : ''}>${LIST_ICON_SVG}List of words (${getWords(cat.csvTopic, state.difficulty).length})</button>
       </div>
     `;
@@ -2538,7 +2545,7 @@ function speakWord(word) {
     utt.pitch   = 1;
     utt.volume  = 1;
     window.speechSynthesis.speak(utt);
-  }, 3000);
+  }, 2300);
 }
 
 function cancelTTS() {
