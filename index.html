@@ -978,7 +978,7 @@
       overflow: hidden;
     }
 
-    #video-bg video {
+    #video-bg img {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -1516,9 +1516,7 @@
 ════════════════════════════════════════════════ -->
 <div id="game-screen" class="hidden">
   <div id="video-bg">
-    <video id="game-bg-video" autoplay loop muted playsinline>
-      <source src="Theme1.mp4" type="video/mp4">
-    </video>
+    <img id="game-bg-video" src="Brandenburg.jpg" alt="" draggable="false">
   </div>
 
   <nav id="navbar">
@@ -1724,7 +1722,7 @@ function updateCategoryHighScore(score) {
 const TOPICS = [
   {
     id: 'berlin', name: 'Berlin', location: 'Brandenburg Gate',
-    image: 'image-0.png', theme: 'Theme1.mp4',
+    image: 'image-0.png', theme: 'Brandenburg.jpg',
     get completed() { return this.categories.filter(c => c.highScore >= 50).length; },
     get total()     { return this.categories.length; },
     categories: [
@@ -1739,7 +1737,7 @@ const TOPICS = [
   },
   {
     id: 'baltic-sea', name: 'Baltic Sea', location: 'Rügen Island',
-    image: 'image-2.png', theme: 'Theme2.mp4',
+    image: 'image-2.png', theme: 'Balticsea.jpg',
     get completed() { return this.categories.filter(c => c.highScore >= 50).length; },
     get total()     { return this.categories.length; },
     categories: [
@@ -1754,7 +1752,7 @@ const TOPICS = [
   },
   {
     id: 'vienna', name: 'Vienna', location: 'Schönbrunn Palace',
-    image: 'image-3.png', theme: 'Theme3.mp4',
+    image: 'image-3.png', theme: 'Vienna.jpg',
     get completed() { return this.categories.filter(c => c.highScore >= 50).length; },
     get total()     { return this.categories.length; },
     categories: [
@@ -1770,7 +1768,7 @@ const TOPICS = [
   },
   {
     id: 'bavaria', name: 'Bavaria', location: 'Neuschwanstein Castle',
-    image: 'Bavaria.png', theme: 'Theme4.mp4',
+    image: 'Bavaria.png', theme: 'Neuschw.jpg',
     get completed() { return this.categories.filter(c => c.highScore >= 50).length; },
     get total()     { return this.categories.length; },
     categories: [
@@ -1786,7 +1784,7 @@ const TOPICS = [
   },
   {
     id: 'swiss-alps', name: 'Swiss Alps', location: 'Matterhorn',
-    image: 'image-1.png', theme: 'Theme5.mp4',
+    image: 'image-1.png', theme: 'Swissalps.jpg',
     get completed() { return this.categories.filter(c => c.highScore >= 50).length; },
     get total()     { return this.categories.length; },
     categories: [
@@ -2045,11 +2043,8 @@ function goToGame(category) {
   // Háttérvideó váltása az adott city theme-je szerint
   const topic = TOPICS.find(t => t.categories.includes(category));
   if (topic) {
-    const videoEl = document.getElementById('game-bg-video');
-    if (videoEl) {
-      const src = videoEl.querySelector('source');
-      if (src) { src.src = topic.theme; videoEl.load(); videoEl.play().catch(() => {}); }
-    }
+    const imgEl = document.getElementById('game-bg-video');
+    if (imgEl) imgEl.src = topic.theme;
   }
 
   updateHUD();
