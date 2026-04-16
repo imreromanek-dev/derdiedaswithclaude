@@ -613,6 +613,18 @@
       background: #fff;
       flex-shrink: 0;
       padding: 0 22px 32px;
+    .city-card-locked {
+      opacity: 0.42;
+      pointer-events: none;
+    }
+    .city-card-locked .city-play-btn,
+    .city-card-locked .city-words-btn { cursor: not-allowed; }
+    .city-card-lock-badge {
+      position: absolute;
+      top: 10px; right: 10px;
+      font-size: 22px;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,.4));
+    }
       box-shadow: 0 4px 32px 0 rgba(0,0,0,0.12);
       user-select: none;
       -webkit-user-select: none;
@@ -1024,7 +1036,13 @@
       flex-shrink: 0;
     }
     .nav-icon-btn:hover { background: rgba(255,255,255,1); }
-    #sound-btn { background: rgba(255,255,255,0.30); }
+    #sound-btn {
+      background: rgba(255,255,255,0.30);
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 9999;
+    }
     #sound-btn:hover { background: rgba(255,255,255,0.45); }
     .nav-icon-btn svg { width: 52%; height: 52%; }
 
@@ -1308,7 +1326,7 @@
     .gm-score-value {
       font-size: clamp(19px, 1.6vw, 23px);
       font-weight: 700;
-      color: #fff;
+      color: #144e56;
     }
 
     .gm-buttons {
@@ -1490,8 +1508,8 @@
 ════════════════════════════════════════════════ -->
 <div id="game-screen" class="hidden">
   <div id="video-bg">
-    <video autoplay loop muted playsinline>
-      <source src="Game-video.mp4" type="video/mp4">
+    <video id="game-bg-video" autoplay loop muted playsinline>
+      <source src="Theme1.mp4" type="video/mp4">
     </video>
   </div>
 
@@ -1697,54 +1715,82 @@ function updateCategoryHighScore(score) {
 
 const TOPICS = [
   {
-    id: 'berlin',
-    name: 'Berlin',
-    location: 'Brandenburg Gate',
-    completed: 0,
-    total: 3,
-    image: 'image-0.png',
+    id: 'berlin', name: 'Berlin', location: 'Brandenburg Gate',
+    image: 'image-0.png', theme: 'Theme1.mp4',
+    get completed() { return this.categories.filter(c => c.highScore >= 50).length; },
+    get total()     { return this.categories.length; },
     categories: [
-      { id: 'leisure',   name: 'Leisure',        icon: '🎭', highScore: 0, csvTopic: 'Leisure'        },
-      { id: 'food',      name: 'Food',            icon: '🍺', highScore: 0, csvTopic: 'Food'           },
-      { id: 'transport', name: 'Transportation',  icon: '🚌', highScore: 0, csvTopic: 'Transportation' },
+      { id: 'food',     name: 'Food',     icon: '🍺', highScore: 0, csvTopic: 'Food'     },
+      { id: 'shopping', name: 'Shopping', icon: '🛍️', highScore: 0, csvTopic: 'Shopping' },
+      { id: 'family',   name: 'Family',   icon: '👨‍👩‍👧', highScore: 0, csvTopic: 'Family'   },
     ],
+    isUnlocked(idx) {
+      if (idx === 0 || idx === 1) return true;
+      return this.categories[0].highScore >= 50 && this.categories[1].highScore >= 50;
+    },
   },
   {
-    id: 'swiss-alps',
-    name: 'Swiss Alps',
-    location: 'Matterhorn',
-    completed: 0,
-    total: 2,
-    image: 'image-1.png',
+    id: 'baltic-sea', name: 'Baltic Sea', location: 'Rügen Island',
+    image: 'image-2.png', theme: 'Theme2.mp4',
+    get completed() { return this.categories.filter(c => c.highScore >= 50).length; },
+    get total()     { return this.categories.length; },
     categories: [
-      { id: 'nature',  name: 'Nature',   icon: '🏔️', highScore: 0, csvTopic: 'Nature'  },
-      { id: 'animals', name: 'Animals',  icon: '🐾', highScore: 0, csvTopic: 'Animals' },
+      { id: 'animals', name: 'Animals', icon: '🐾', highScore: 0, csvTopic: 'Animals' },
+      { id: 'nature',  name: 'Nature',  icon: '🌿', highScore: 0, csvTopic: 'Nature'  },
+      { id: 'health',  name: 'Health',  icon: '❤️', highScore: 0, csvTopic: 'Health'  },
     ],
+    isUnlocked(idx) {
+      if (idx === 0) return true;
+      return this.categories[idx - 1].highScore >= 50;
+    },
   },
   {
-    id: 'baltic-sea',
-    name: 'Baltic Sea',
-    location: 'Rügen Island',
-    completed: 0,
-    total: 2,
-    image: 'image-2.png',
+    id: 'vienna', name: 'Vienna', location: 'Schönbrunn Palace',
+    image: 'image-3.png', theme: 'Theme3.mp4',
+    get completed() { return this.categories.filter(c => c.highScore >= 50).length; },
+    get total()     { return this.categories.length; },
     categories: [
-      { id: 'society', name: 'Society',  icon: '🌊', highScore: 0, csvTopic: 'Society'  },
-      { id: 'science', name: 'Science',  icon: '🔬', highScore: 0, csvTopic: 'Science'  },
+      { id: 'transportation', name: 'Transportation', icon: '🚌', highScore: 0, csvTopic: 'Transportation' },
+      { id: 'work',           name: 'Work',           icon: '💼', highScore: 0, csvTopic: 'Work'           },
+      { id: 'the-arts',       name: 'The Arts',       icon: '🎻', highScore: 0, csvTopic: 'The arts'       },
+      { id: 'psychology',     name: 'Psychology',     icon: '🧠', highScore: 0, csvTopic: 'Psychology'     },
     ],
+    isUnlocked(idx) {
+      if (idx === 0) return true;
+      return this.categories[idx - 1].highScore >= 50;
+    },
   },
   {
-    id: 'vienna',
-    name: 'Vienna',
-    location: 'Schönbrunn Palace',
-    completed: 0,
-    total: 3,
-    image: 'image-3.png',
+    id: 'bavaria', name: 'Bavaria', location: 'Neuschwanstein Castle',
+    image: 'Bavaria.png', theme: 'Theme4.mp4',
+    get completed() { return this.categories.filter(c => c.highScore >= 50).length; },
+    get total()     { return this.categories.length; },
     categories: [
-      { id: 'arts',       name: 'The Arts',    icon: '🎻', highScore: 0, csvTopic: 'The arts'    },
-      { id: 'food',       name: 'Food',        icon: '☕', highScore: 0, csvTopic: 'Food'        },
-      { id: 'psychology', name: 'Psychology',  icon: '🌿', highScore: 0, csvTopic: 'Psychology'  },
+      { id: 'house',     name: 'House',     icon: '🏠', highScore: 0, csvTopic: 'House'     },
+      { id: 'education', name: 'Education', icon: '📚', highScore: 0, csvTopic: 'Education' },
+      { id: 'military',  name: 'Military',  icon: '⚔️', highScore: 0, csvTopic: 'Military'  },
+      { id: 'society',   name: 'Society',   icon: '🏛️', highScore: 0, csvTopic: 'Society'   },
     ],
+    isUnlocked(idx) {
+      if (idx === 0) return true;
+      return this.categories[idx - 1].highScore >= 50;
+    },
+  },
+  {
+    id: 'swiss-alps', name: 'Swiss Alps', location: 'Matterhorn',
+    image: 'image-1.png', theme: 'Theme5.mp4',
+    get completed() { return this.categories.filter(c => c.highScore >= 50).length; },
+    get total()     { return this.categories.length; },
+    categories: [
+      { id: 'leisure',      name: 'Leisure',      icon: '🎭', highScore: 0, csvTopic: 'Leisure'      },
+      { id: 'time',         name: 'Time',         icon: '⏰', highScore: 0, csvTopic: 'Time'         },
+      { id: 'science',      name: 'Science',      icon: '🔬', highScore: 0, csvTopic: 'Science'      },
+      { id: 'conceptional', name: 'Conceptional', icon: '💡', highScore: 0, csvTopic: 'Conceptional' },
+    ],
+    isUnlocked(idx) {
+      if (idx === 0) return true;
+      return this.categories[idx - 1].highScore >= 50;
+    },
   },
 ];
 
@@ -1986,7 +2032,18 @@ function goToGame(category) {
   state.round     = 1;
   state.score     = 0;
   state.usedIdxs  = [];
-  state.highScore = category.highScore; // tárolt high score betöltése
+  state.highScore = category.highScore;
+
+  // Háttérvideó váltása az adott city theme-je szerint
+  const topic = TOPICS.find(t => t.categories.includes(category));
+  if (topic) {
+    const videoEl = document.getElementById('game-bg-video');
+    if (videoEl) {
+      const src = videoEl.querySelector('source');
+      if (src) { src.src = topic.theme; videoEl.load(); videoEl.play().catch(() => {}); }
+    }
+  }
+
   updateHUD();
   showView('game');
   initPoppers();
@@ -2124,9 +2181,10 @@ function renderCityCards(topic) {
       </div>`;
   }
 
-  topic.categories.forEach(cat => {
+  topic.categories.forEach((cat, idx) => {
+    const unlocked = topic.isUnlocked ? topic.isUnlocked(idx) : true;
     const card = document.createElement('div');
-    card.className = 'city-card';
+    card.className = 'city-card' + (unlocked ? '' : ' city-card-locked');
     card.innerHTML = `
       <div class="city-card-header">
         <img class="city-card-header-bg" src="${CITY_CARD_HEADER_IMG}" alt="" draggable="false">
@@ -2135,18 +2193,21 @@ function renderCityCards(topic) {
           <img class="city-card-icon-img" src="${TENNIS_ICON_URI}" alt="${cat.name}">
           <span class="city-card-cat">${cat.name}</span>
         </div>
+        ${!unlocked ? '<div class="city-card-lock-badge">🔒</div>' : ''}
       </div>
       <div class="city-card-hs">
         <div class="city-hs-label">High score</div>
         <div class="city-hs-value">${cat.highScore}</div>
       </div>
       <div class="city-card-actions">
-        <button class="city-play-btn">Play</button>
-        <button class="city-words-btn">${LIST_ICON_SVG}List of words (${getWords(cat.csvTopic, state.difficulty).length})</button>
+        <button class="city-play-btn" ${!unlocked ? 'disabled' : ''}>Play</button>
+        <button class="city-words-btn" ${!unlocked ? 'disabled' : ''}>${LIST_ICON_SVG}List of words (${getWords(cat.csvTopic, state.difficulty).length})</button>
       </div>
     `;
-    card.querySelector('.city-play-btn').addEventListener('click', () => goToGame(cat));
-    card.querySelector('.city-words-btn').addEventListener('click', () => goToWordList(cat));
+    if (unlocked) {
+      card.querySelector('.city-play-btn').addEventListener('click', () => goToGame(cat));
+      card.querySelector('.city-words-btn').addEventListener('click', () => goToWordList(cat));
+    }
     container.appendChild(card);
   });
 }
