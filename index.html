@@ -318,6 +318,24 @@
       display: flex;
       align-items: center;
       gap: 9px;
+      background: rgba(20, 78, 86, 0.06);
+      border: 1.5px solid rgba(20, 78, 86, 0.15);
+      border-radius: 999px;
+      padding: 7px 14px 7px 11px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 160ms ease, border-color 160ms ease, transform 80ms ease;
+    }
+    .topic-header-right:hover {
+      background: rgba(20, 78, 86, 0.12);
+      border-color: rgba(20, 78, 86, 0.25);
+    }
+    .topic-header-right:active {
+      transform: scale(0.97);
+    }
+    .topic-header-right:focus-visible {
+      outline: 2px solid #144e56;
+      outline-offset: 2px;
     }
     .topic-diff-label {
       font-size: clamp(14px, calc(0.5515vw + 11.35px), 17px);
@@ -1312,6 +1330,33 @@
       color: #6b6b6b;
     }
 
+    .gm-rules-block {
+      display: flex;
+      flex-direction: column;
+      gap: clamp(6px, 0.9vw, 13px);
+      align-items: center;
+    }
+    .gm-rule-box {
+      background: #fff;
+      border: 2px solid rgba(0, 0, 0, 0.1);
+      border-radius: 4px;
+      padding: clamp(6px, 0.55vw, 8px) clamp(8px, 0.85vw, 12px);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: clamp(90px, 9vw, 128px);
+    }
+    .gm-rule-box span {
+      font-size: clamp(16px, 1.9vw, 27px);
+      font-weight: 700;
+      color: #454545;
+      line-height: 1;
+      text-align: center;
+      white-space: nowrap;
+    }
+    /* Üres szabály esetén az egész blokk rejtve */
+    .gm-rules-block.empty { display: none; }
+
     .gm-scores {
       display: flex;
       flex-direction: row;
@@ -1415,10 +1460,6 @@
 </head>
 <body>
 
-<!-- ══ Zene ══ -->
-<audio id="audio-menu" src="Menu-Music.mp3"    loop preload="auto"></audio>
-<audio id="audio-game" src="Gameplay-Music.mp3" loop preload="auto"></audio>
-
 <!-- ═══════════════════════════════════════════════
      1. WELCOME SCREEN
 ════════════════════════════════════════════════ -->
@@ -1457,10 +1498,10 @@
         </button>
         <span class="topic-modal-title-text">Topic</span>
       </div>
-      <div class="topic-header-right">
+      <button class="topic-header-right" id="topic-diff-btn" type="button" title="Back to difficulty selector">
         <span id="topic-diff-icon-svg"><!-- JS sets SVG --></span>
         <span class="topic-diff-label" id="topic-diff-label">BASIC</span>
-      </div>
+      </button>
     </div>
     <div id="topic-scroll"><!-- JS rendered --></div>
   </div>
@@ -1607,6 +1648,10 @@
         <div class="gm-article-word" id="modal-article-word">—</div>
         <div class="gm-english" id="modal-english">—</div>
       </div>
+      <div class="gm-rules-block" id="modal-rules-block">
+        <div class="gm-label">Rules:</div>
+        <div class="gm-rule-box"><span id="modal-rule-text">—</span></div>
+      </div>
       <div class="gm-scores">
         <div class="gm-score-col">
           <span class="gm-score-label">Current score</span>
@@ -1634,7 +1679,7 @@
 //  WORD DATABASE  (loaded from Nouns.csv)
 // ════════════════════════════════════════════════
 
-let DB = [];  // { article, german, english, difficulty, topic }
+let DB = [];  // { article, german, english, difficulty, topic, ruleEnding }
 
 // Kumulatív nehézség: Basic → B, Intermediate → B+M, Advanced → B+M+A
 const DIFF_LEVELS = { Basic: 1, Intermediate: 2, Advanced: 3 };
@@ -1660,10 +1705,12 @@ async function loadDB() {
       const english    = cols[2].trim();
       const difficulty = cols[3].trim();
       const topic      = cols[4].trim();
+      // G oszlop (index 6) — Rule ending. Hiányzó oszlop esetén üres string.
+      const ruleEnding = (cols[6] || '').trim();
       if (!['der','die','das'].includes(article)) continue;
       if (!['B','M','A'].includes(difficulty))    continue;
       if (!german || !topic) continue;
-      DB.push({ article, german, english, difficulty, topic });
+      DB.push({ article, german, english, difficulty, topic, ruleEnding });
     }
     console.log(`DB loaded: ${DB.length} words`);
   } catch (e) {
@@ -1676,15 +1723,19 @@ async function loadDB() {
 // ════════════════════════════════════════════════
 //  PROGRESS PERSISTENCE  (localStorage)
 // ════════════════════════════════════════════════
-// Kulcs: 'ddd_v1'  →  { "berlin_leisure": 4, "swiss-alps_nature": 3, … }
+// Kulcs: 'ddd_v3'  →  { "berlin_food_Basic": 12, "berlin_food_Intermediate": 7, … }
+//                      nehézségenként külön számolt high score-ok
 
-const SAVE_KEY = 'ddd_v2';
+const SAVE_KEY = 'ddd_v3';
+const DIFFS    = ['Basic', 'Intermediate', 'Advanced'];
 
 function saveProgress() {
   const data = {};
   TOPICS.forEach(topic => {
     topic.categories.forEach(cat => {
-      data[`${topic.id}_${cat.id}`] = cat.highScore;
+      DIFFS.forEach(d => {
+        data[`${topic.id}_${cat.id}_${d}`] = cat.highScores[d] || 0;
+      });
     });
   });
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) {}
@@ -1697,24 +1748,22 @@ function loadProgress() {
     const data = JSON.parse(raw);
     TOPICS.forEach(topic => {
       topic.categories.forEach(cat => {
-        const val = data[`${topic.id}_${cat.id}`];
-        if (typeof val === 'number') cat.highScore = val;
+        DIFFS.forEach(d => {
+          const val = data[`${topic.id}_${cat.id}_${d}`];
+          if (typeof val === 'number') cat.highScores[d] = val;
+        });
       });
-      // completed = kategóriák amelyekben van legalább 1 pont
-      topic.completed = topic.categories.filter(c => c.highScore > 0).length;
     });
   } catch (e) {}
 }
 
-// Kategória high score frissítése játék végén
+// Kategória high score frissítése játék végén (a jelenlegi nehézséghez)
 function updateCategoryHighScore(score) {
   const cat = state.selectedCategory;
-  if (!cat) return;
-  if (score > cat.highScore) {
-    cat.highScore = score;
-    // completed újraszámolás a szülő topicban
-    const topic = TOPICS.find(t => t.categories.includes(cat));
-    if (topic) topic.completed = topic.categories.filter(c => c.highScore > 0).length;
+  const d   = state.difficulty;
+  if (!cat || !d) return;
+  if (score > (cat.highScores[d] || 0)) {
+    cat.highScores[d] = score;
     saveProgress();
   }
 }
@@ -1723,79 +1772,99 @@ const TOPICS = [
   {
     id: 'berlin', name: 'Berlin', location: 'Brandenburg Gate',
     image: 'image-0.png', theme: 'Brandenburg.jpg',
-    get completed() { return this.categories.filter(c => c.highScore >= 50).length; },
+    get completed() {
+      const d = state.difficulty || 'Basic';
+      return this.categories.filter(c => c.highScores[d] >= UNLOCK_THRESHOLD).length;
+    },
     get total()     { return this.categories.length; },
     categories: [
-      { id: 'food',     name: 'Food',     icon: '🍺', highScore: 0, csvTopic: 'Food'     },
-      { id: 'shopping', name: 'Shopping', icon: '🛍️', highScore: 0, csvTopic: 'Shopping' },
-      { id: 'family',   name: 'Family',   icon: '👨‍👩‍👧', highScore: 0, csvTopic: 'Family'   },
+      { id: 'food',     name: 'Food',     icon: '🍺', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Food'     },
+      { id: 'shopping', name: 'Shopping', icon: '🛍️', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Shopping' },
+      { id: 'family',   name: 'Family',   icon: '👨‍👩‍👧', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Family'   },
     ],
     isUnlocked(idx) {
       if (idx === 0 || idx === 1) return true;
-      return this.categories[0].highScore >= 50 && this.categories[1].highScore >= 50;
+      const d = state.difficulty || 'Basic';
+      return this.categories[0].highScores[d] >= UNLOCK_THRESHOLD && this.categories[1].highScores[d] >= UNLOCK_THRESHOLD;
     },
   },
   {
     id: 'baltic-sea', name: 'Baltic Sea', location: 'Rügen Island',
     image: 'image-2.png', theme: 'Balticsea.jpg',
-    get completed() { return this.categories.filter(c => c.highScore >= 50).length; },
+    get completed() {
+      const d = state.difficulty || 'Basic';
+      return this.categories.filter(c => c.highScores[d] >= UNLOCK_THRESHOLD).length;
+    },
     get total()     { return this.categories.length; },
     categories: [
-      { id: 'animals', name: 'Animals', icon: '🐾', highScore: 0, csvTopic: 'Animals' },
-      { id: 'nature',  name: 'Nature',  icon: '🌿', highScore: 0, csvTopic: 'Nature'  },
-      { id: 'health',  name: 'Health',  icon: '❤️', highScore: 0, csvTopic: 'Health'  },
+      { id: 'animals', name: 'Animals', icon: '🐾', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Animals' },
+      { id: 'nature',  name: 'Nature',  icon: '🌿', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Nature'  },
+      { id: 'health',  name: 'Health',  icon: '❤️', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Health'  },
     ],
     isUnlocked(idx) {
       if (idx === 0) return true;
-      return this.categories[idx - 1].highScore >= 50;
+      const d = state.difficulty || 'Basic';
+      return this.categories[idx - 1].highScores[d] >= UNLOCK_THRESHOLD;
     },
   },
   {
     id: 'vienna', name: 'Vienna', location: 'Schönbrunn Palace',
     image: 'image-3.png', theme: 'Vienna.jpg',
-    get completed() { return this.categories.filter(c => c.highScore >= 50).length; },
+    get completed() {
+      const d = state.difficulty || 'Basic';
+      return this.categories.filter(c => c.highScores[d] >= UNLOCK_THRESHOLD).length;
+    },
     get total()     { return this.categories.length; },
     categories: [
-      { id: 'transportation', name: 'Transportation', icon: '🚌', highScore: 0, csvTopic: 'Transportation' },
-      { id: 'work',           name: 'Work',           icon: '💼', highScore: 0, csvTopic: 'Work'           },
-      { id: 'the-arts',       name: 'The Arts',       icon: '🎻', highScore: 0, csvTopic: 'The arts'       },
-      { id: 'psychology',     name: 'Psychology',     icon: '🧠', highScore: 0, csvTopic: 'Psychology'     },
+      { id: 'transportation', name: 'Transportation', icon: '🚌', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Transportation' },
+      { id: 'work',           name: 'Work',           icon: '💼', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Work'           },
+      { id: 'the-arts',       name: 'The Arts',       icon: '🎻', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'The arts'       },
+      { id: 'psychology',     name: 'Psychology',     icon: '🧠', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Psychology'     },
     ],
     isUnlocked(idx) {
       if (idx === 0) return true;
-      return this.categories[idx - 1].highScore >= 50;
+      const d = state.difficulty || 'Basic';
+      return this.categories[idx - 1].highScores[d] >= UNLOCK_THRESHOLD;
     },
   },
   {
     id: 'bavaria', name: 'Bavaria', location: 'Neuschwanstein Castle',
     image: 'Bavaria.png', theme: 'Neuschw.jpg',
-    get completed() { return this.categories.filter(c => c.highScore >= 50).length; },
+    get completed() {
+      const d = state.difficulty || 'Basic';
+      return this.categories.filter(c => c.highScores[d] >= UNLOCK_THRESHOLD).length;
+    },
     get total()     { return this.categories.length; },
     categories: [
-      { id: 'house',     name: 'House',     icon: '🏠', highScore: 0, csvTopic: 'House'     },
-      { id: 'education', name: 'Education', icon: '📚', highScore: 0, csvTopic: 'Education' },
-      { id: 'military',  name: 'Military',  icon: '⚔️', highScore: 0, csvTopic: 'Military'  },
-      { id: 'society',   name: 'Society',   icon: '🏛️', highScore: 0, csvTopic: 'Society'   },
+      { id: 'house',     name: 'House',     icon: '🏠', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'House'     },
+      { id: 'education', name: 'Education', icon: '📚', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Education' },
+      { id: 'military',  name: 'Military',  icon: '⚔️', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Military'  },
+      { id: 'society',   name: 'Society',   icon: '🏛️', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Society'   },
     ],
     isUnlocked(idx) {
       if (idx === 0) return true;
-      return this.categories[idx - 1].highScore >= 50;
+      const d = state.difficulty || 'Basic';
+      return this.categories[idx - 1].highScores[d] >= UNLOCK_THRESHOLD;
     },
   },
   {
     id: 'swiss-alps', name: 'Swiss Alps', location: 'Matterhorn',
     image: 'image-1.png', theme: 'Swissalps.jpg',
-    get completed() { return this.categories.filter(c => c.highScore >= 50).length; },
+    get completed() {
+      const d = state.difficulty || 'Basic';
+      return this.categories.filter(c => c.highScores[d] >= UNLOCK_THRESHOLD).length;
+    },
     get total()     { return this.categories.length; },
     categories: [
-      { id: 'leisure',      name: 'Leisure',      icon: '🎭', highScore: 0, csvTopic: 'Leisure'      },
-      { id: 'time',         name: 'Time',         icon: '⏰', highScore: 0, csvTopic: 'Time'         },
-      { id: 'science',      name: 'Science',      icon: '🔬', highScore: 0, csvTopic: 'Science'      },
-      { id: 'conceptional', name: 'Conceptional', icon: '💡', highScore: 0, csvTopic: 'Conceptional' },
+      { id: 'leisure',      name: 'Leisure',      icon: '🎭', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Leisure'      },
+      { id: 'time',         name: 'Time',         icon: '⏰', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Time'         },
+      { id: 'science',      name: 'Science',      icon: '🔬', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Science'      },
+      { id: 'conceptional', name: 'Conceptional', icon: '💡', highScores: { Basic: 0, Intermediate: 0, Advanced: 0 }, csvTopic: 'Conceptional' },
     ],
     isUnlocked(idx) {
       if (idx === 0) return true;
-      return this.categories[idx - 1].highScore >= 50;
+      const d = state.difficulty || 'Basic';
+      return this.categories[idx - 1].highScores[d] >= UNLOCK_THRESHOLD;
     },
   },
 ];
@@ -1858,7 +1927,8 @@ const state = {
   riseSpeed: 2,
 };
 
-const TOTAL_ROUNDS     = 5;
+const TOTAL_ROUNDS     = 25;
+const UNLOCK_THRESHOLD = 25;     // Minimum pontszám a következő szint feloldásához
 const RISE_DURATION_MS = 6100;
 
 // ════════════════════════════════════════════════
@@ -2038,7 +2108,7 @@ function goToGame(category) {
   state.round     = 1;
   state.score     = 0;
   state.usedIdxs  = [];
-  state.highScore = category.highScore;
+  state.highScore = (category.highScores && category.highScores[state.difficulty]) || 0;
 
   // Háttérvideó váltása az adott city theme-je szerint
   const topic = TOPICS.find(t => t.categories.includes(category));
@@ -2199,10 +2269,10 @@ function renderCityCards(topic) {
       </div>
       <div class="city-card-hs">
         <div class="city-hs-label">High score</div>
-        <div class="city-hs-value">${cat.highScore}</div>
+        <div class="city-hs-value">${cat.highScores[state.difficulty] || 0}</div>
       </div>
       <div class="city-card-actions">
-        <button class="city-play-btn" ${!unlocked ? 'disabled' : ''}>${unlocked ? 'Play' : `<svg width="15" height="18" viewBox="0 0 15 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4.82143 4.82143V6.42857H10.1786V4.82143C10.1786 3.34821 8.97321 2.14286 7.5 2.14286C5.9933 2.14286 4.82143 3.34821 4.82143 4.82143ZM2.67857 6.42857V4.82143C2.67857 2.17634 4.82143 0 7.5 0C10.1451 0 12.3214 2.17634 12.3214 4.82143V6.42857H12.8571C14.029 6.42857 15 7.39955 15 8.57143V15C15 16.2054 14.029 17.1429 12.8571 17.1429H2.14286C0.9375 17.1429 0 16.2054 0 15V8.57143C0 7.39955 0.9375 6.42857 2.14286 6.42857H2.67857Z" fill="white"/></svg>Reach 50 points to unlock level`}</button>
+        <button class="city-play-btn" ${!unlocked ? 'disabled' : ''}>${unlocked ? 'Play' : `<svg width="15" height="18" viewBox="0 0 15 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4.82143 4.82143V6.42857H10.1786V4.82143C10.1786 3.34821 8.97321 2.14286 7.5 2.14286C5.9933 2.14286 4.82143 3.34821 4.82143 4.82143ZM2.67857 6.42857V4.82143C2.67857 2.17634 4.82143 0 7.5 0C10.1451 0 12.3214 2.17634 12.3214 4.82143V6.42857H12.8571C14.029 6.42857 15 7.39955 15 8.57143V15C15 16.2054 14.029 17.1429 12.8571 17.1429H2.14286C0.9375 17.1429 0 16.2054 0 15V8.57143C0 7.39955 0.9375 6.42857 2.14286 6.42857H2.67857Z" fill="white"/></svg>Reach 25 points to unlock level`}</button>
         <button class="city-words-btn" ${!unlocked ? 'disabled' : ''}>${LIST_ICON_SVG}List of words (${getWords(cat.csvTopic, state.difficulty).length})</button>
       </div>
     `;
@@ -2264,6 +2334,7 @@ function startRound() {
   // Reset fertig-specific modal overrides
   delete $('game-modal-overlay').dataset.fertig;
   document.querySelector('.gm-correct-block').style.display = '';
+  $('modal-rules-block').style.display = '';
   $('try-again-btn').textContent = 'Try again';
   $('main-menu-btn').style.display = '';
   $('modal-english').style.fontWeight = '';
@@ -2339,7 +2410,6 @@ function handleCorrect() {
   setTimeout(() => {
     $bg.style.transition = '';
     $('check-icon').classList.add('show');
-    playSFX('correct');
     state.score++;
     updateHUD();
 
@@ -2388,9 +2458,18 @@ function handleWrong(reason) {
       $('modal-article-word').innerHTML =
         `<span class="article-colored ${art}">${capArt}</span> ${state.word.german}`;
       $('modal-english').textContent      = state.word.english;
+      // Rules szekció — csak akkor jelenjen meg, ha van Rule ending
+      const rulesBlock = $('modal-rules-block');
+      const ruleText   = (state.word.ruleEnding || '').trim();
+      if (ruleText) {
+        $('modal-rule-text').textContent = ruleText;
+        rulesBlock.classList.remove('empty');
+      } else {
+        $('modal-rule-text').textContent = '';
+        rulesBlock.classList.add('empty');
+      }
       $('modal-score').textContent        = state.score;
       $('modal-hs').textContent           = state.highScore;
-      playSFX('incorrect');
       $('game-modal-overlay').classList.remove('hidden');
     }, 580);
   }, 300);
@@ -2409,12 +2488,12 @@ function finishGame() {
   $('modal-english').style.color      = '#144e56';
   $('modal-score').textContent       = state.score;
   $('modal-hs').textContent          = state.highScore;
-  // Fertig state: hide correct-article block, rename button, hide main-menu btn
+  // Fertig state: hide correct-article block, hide rules block, rename button, hide main-menu btn
   $('game-modal-overlay').dataset.fertig = '1';
   document.querySelector('.gm-correct-block').style.display = 'none';
+  $('modal-rules-block').style.display = 'none';
   $('try-again-btn').textContent = 'Main menu';
   $('main-menu-btn').style.display = 'none';
-  playSFX('highScore');
   $('game-modal-overlay').classList.remove('hidden');
 }
 
@@ -2443,6 +2522,7 @@ document.querySelectorAll('.diff-btn').forEach(btn => {
 
 // Back buttons (all route through goBack())
 $('topic-back-btn').addEventListener('click',     goBack);
+$('topic-diff-btn').addEventListener('click',     goToWelcome);
 $('city-back-btn').addEventListener('click',      goBack);
 $('word-list-back-btn').addEventListener('click', goBack);
 $('game-back-btn').addEventListener('click',      goBack);
@@ -2482,16 +2562,11 @@ $('main-menu-btn').addEventListener('click', () => {
 // ════════════════════════════════════════════════
 
 // ── Zene (loop) ──────────────────────────────────
-const audioMenu = $('audio-menu');
-const audioGame = $('audio-game');
-audioMenu.volume = 0.40;
-audioGame.volume = 0.20;
-
 // ── Web Audio API – zéró latencia SFX ────────────
-// Az Audio() elemekkel ellentétben a decodeAudioData előre dekódolja a hangot,
-// így a lejátszás azonnal, delay nélkül indul el.
+// Csak a lufi-pukkanás SFX maradt; a többi hang (menüzene, click, correct,
+// incorrect, highScore) a UX-frissítés során eltávolításra került.
 const _actx = new (window.AudioContext || window.webkitAudioContext)();
-const _sfxVolumes = { correct: 0.9, pop: 1.0, incorrect: 0.9, highScore: 0.9, click: 0.6 };
+const _sfxVolumes = { pop: 1.0 };
 const _sfxBuffers = {};
 
 async function _loadSFX(key, url) {
@@ -2502,14 +2577,8 @@ async function _loadSFX(key, url) {
   } catch (e) { /* fájl hiányában csendben folytatja */ }
 }
 
-// Minden SFX előre betölt
-Promise.all([
-  _loadSFX('correct',   'Correct.mp3'),
-  _loadSFX('pop',       'Wrong-Answer-Balloon-Pop.mp3'),
-  _loadSFX('incorrect', 'Incorrect.mp3'),
-  _loadSFX('highScore', 'High-Score.mp3'),
-  _loadSFX('click',     'Menu-Click.mp3'),
-]);
+// Csak a lufi-pukkanás hang töltődik be
+_loadSFX('pop', 'Wrong-Answer-Balloon-Pop.mp3');
 
 function playSFX(key) {
   if (!state.soundOn) return;
@@ -2549,24 +2618,11 @@ function cancelTTS() {
 }
 
 // ── Zene váltók ──────────────────────────────────
-function playMenuMusic() {
-  if (!state.soundOn) return;
-  audioGame.pause();
-  audioGame.currentTime = 0;
-  audioMenu.play().catch(() => {});
-}
-
-function playGameMusic() {
-  if (!state.soundOn) return;
-  audioMenu.pause();
-  audioMenu.currentTime = 0;
-  audioGame.play().catch(() => {});
-}
-
-function stopAllMusic() {
-  audioMenu.pause();
-  audioGame.pause();
-}
+// A háttérzenét eltávolítottuk — ezek a függvények üresek maradtak,
+// hogy a meglévő hívóhelyek ne törjenek el.
+function playMenuMusic() {}
+function playGameMusic() {}
+function stopAllMusic()  {}
 
 // ── Hang ki/be gomb szinkron ─────────────────────
 function syncSoundBtns() {
@@ -2592,11 +2648,7 @@ function toggleSound() {
 $('welcome-sound-btn').addEventListener('click', toggleSound);
 if ($('sound-btn')) $('sound-btn').addEventListener('click', toggleSound);
 
-// ── Menu-Click: minden kattintásra, azonnal ───────
-document.addEventListener('click', () => {
-  if (_actx.state === 'suspended') _actx.resume();
-  playSFX('click');
-}, true);
+// (A globális click-hang eltávolításra került.)
 
 
 // ════════════════════════════════════════════════
