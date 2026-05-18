@@ -1,0 +1,12 @@
+[
+     {
+       "relation": ["delegate_permission/common.handle_all_urls"],
+       "target": {
+         "namespace": "android_app",
+         "package_name": "com.derdiedas.app",
+         "sha256_cert_fingerprints": [
+           "62:C1:E6:3C:18:70:2D:CB:C1:C6:21:A2:25:50:C6:FB:00:DC:60:54:C0:D3:10:BB:3E:A2:3E:AB:D4:0C:60:61"
+         ]
+       }
+     }
+   ]
