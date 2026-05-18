@@ -7,7 +7,7 @@
 // Pages újra deploy-ol. A user következő nyitásakor a SW észreveszi az új
 // verziót és háttérben letölti; második nyitáskor már az új verzió fut.
 
-const CACHE_VERSION = 'ddd-v1';
+const CACHE_VERSION = 'ddd-v2';
 const CACHE_NAME    = `derdiedas-${CACHE_VERSION}`;
 
 // Az app shell — minden, ami nélkül a játék nem indul el offline.

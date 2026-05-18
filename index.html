@@ -2608,19 +2608,91 @@ function playSFX(key) {
 }
 
 // ── TTS – szó kimondása de-DE hangon ─────────────
-let _ttsTimer = null;
+// A Web Speech API mobil-Androidon és iOS Safarin notórikus, ezért
+// több réteges robusztusítás kell:
+//  1) A voices lista aszinkron töltődik → várjuk meg, és válasszunk
+//     német hangot explicit a `lang='de-DE'` "találgatás" helyett.
+//  2) Néhány Android Chrome buildben az első speak() hívás csendben
+//     megbukik, ha még nem volt user-gesture a speech engine felé →
+//     az első user-interakciónál "primingoljuk" egy üres utterance-szel.
+//  3) Diagnosztikai log: ha valami nem szól, a Chrome devtools
+//     konzolban (chrome://inspect → telefonon) látszik miért.
+let _ttsTimer    = null;
+let _ttsVoice    = null;
+let _ttsPrimed   = false;
+let _ttsDiagDone = false;
+
+function _selectGermanVoice() {
+  if (!window.speechSynthesis) return;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices || !voices.length) return;
+  // Sorrend: pontos de-DE → bármi ami de-vel kezdődik → semmi (mindenképp
+  // megjelöljük _ttsVoice-t, hogy ne keressünk minden hívásnál).
+  _ttsVoice = voices.find(v => v.lang === 'de-DE')
+           || voices.find(v => v.lang && v.lang.toLowerCase().startsWith('de'))
+           || null;
+  if (!_ttsDiagDone) {
+    _ttsDiagDone = true;
+    const deList = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('de'))
+                         .map(v => `${v.name} (${v.lang})`);
+    console.log(
+      '[TTS] voices loaded:', voices.length,
+      '| de-* voices:', deList.length ? deList.join(', ') : '(none — install a German TTS voice in Android settings)',
+      '| picked:', _ttsVoice ? `${_ttsVoice.name} (${_ttsVoice.lang})` : '(none → browser will pick)'
+    );
+  }
+}
+
+if (window.speechSynthesis) {
+  // Sok böngészőn a getVoices() szinkron-üres az első futtatáskor.
+  _selectGermanVoice();
+  // A 'voiceschanged' event akkor süt el, amikor a lista elérhetővé válik.
+  window.speechSynthesis.addEventListener('voiceschanged', _selectGermanVoice);
+}
+
+// Speech engine "primingolása" az első user-interakciónál.
+// Egy néma utterance-ot ejtünk be, hogy az Android Chrome user-gesture
+// láncot regisztrálja. Ez nélkülözhetetlen, ha a tényleges speak() egy
+// nagyobb késleltetés után fut (mint nálunk 2300 ms-mel).
+function _primeTTS() {
+  if (_ttsPrimed || !window.speechSynthesis) return;
+  _ttsPrimed = true;
+  try {
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0;
+    u.rate   = 1;
+    window.speechSynthesis.speak(u);
+  } catch (e) { /* csendben */ }
+}
+// Bármilyen első érintésnél lefut, aztán önmagát kikapcsolja.
+['pointerdown', 'touchstart', 'click', 'keydown'].forEach(evt => {
+  window.addEventListener(evt, _primeTTS, { once: true, passive: true, capture: true });
+});
+
 function speakWord(word) {
   clearTimeout(_ttsTimer);
   if (!state.soundOn || !window.speechSynthesis) return;
   _ttsTimer = setTimeout(() => {
     if (!state.soundOn) return;
+    // Ha még nincs kiválasztott hang (pl. első kör), próbáljuk most.
+    if (!_ttsVoice) _selectGermanVoice();
+    // Néhány Android Chrome buildben a queue beragad — cancel-lel
+    // ürítjük, ezután speak újra megy.
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(word);
-    utt.lang    = 'de-DE';
-    utt.rate    = 0.88;
-    utt.pitch   = 1;
-    utt.volume  = 1;
-    window.speechSynthesis.speak(utt);
+    utt.lang   = 'de-DE';
+    if (_ttsVoice) utt.voice = _ttsVoice;
+    utt.rate   = 0.88;
+    utt.pitch  = 1;
+    utt.volume = 1;
+    utt.onerror = (e) => {
+      console.warn('[TTS] utterance error:', e && e.error, '| word:', word);
+    };
+    try {
+      window.speechSynthesis.speak(utt);
+    } catch (e) {
+      console.warn('[TTS] speak() threw:', e && e.message);
+    }
   }, 2300);
 }
 
