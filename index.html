@@ -7,6 +7,18 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>Der · Die · Das</title>
+
+  <!-- ── PWA / Android-Chrome integráció ──────────────────────────────── -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#144e56">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Der Die Das">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
@@ -2785,6 +2797,20 @@ loadDB().then(() => {
   initHorizontalScroll($('topic-scroll'));
   initHorizontalScroll($('city-scroll'));
 });
+
+// ════════════════════════════════════════════════
+//  SERVICE WORKER REGISTRATION (PWA / offline)
+// ════════════════════════════════════════════════
+// Csak ott regisztráljuk, ahol értelme van: HTTPS-en vagy localhoston,
+// és csak ha a böngésző támogatja. A regisztráció nem-blokkoló: a load
+// esemény után fut, hogy ne lassítsa az első renderelést.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((err) => {
+      console.warn('[SW] Registration failed:', err);
+    });
+  });
+}
 </script>
 </body>
 </html>
